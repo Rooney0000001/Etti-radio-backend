@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ETTI RADIO — Producer Panel</title>
+<style>
+  :root{
+    --navy:#0b1530;
+    --navy-deep:#070d1f;
+    --gold:#f2b705;
+    --crimson:#c21807;
+    --cream:#f3ecd9;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:linear-gradient(180deg, var(--navy) 0%, var(--navy-deep) 100%);
+    color:var(--cream);
+    font-family:'Segoe UI', sans-serif;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  }
+  .card{
+    background:rgba(255,255,255,0.03);
+    border:1px solid rgba(242,183,5,0.25);
+    border-radius:14px;
+    padding:30px 24px;
+    max-width:420px;
+    width:100%;
+  }
+  h1{
+    font-size:20px;
+    color:var(--gold);
+    margin-bottom:4px;
+    letter-spacing:1px;
+  }
+  .sub{
+    font-size:12px;
+    color:rgba(243,236,217,0.55);
+    margin-bottom:24px;
+  }
+  label{
+    display:block;
+    font-size:12px;
+    letter-spacing:1px;
+    color:rgba(243,236,217,0.7);
+    margin-bottom:6px;
+    margin-top:16px;
+  }
+  input[type="text"], input[type="password"]{
+    width:100%;
+    padding:12px;
+    border-radius:8px;
+    border:1px solid rgba(242,183,5,0.3);
+    background:rgba(0,0,0,0.3);
+    color:var(--cream);
+    font-size:14px;
+  }
+  input:focus{ outline:2px solid var(--gold); }
+  .btn-row{
+    display:flex;
+    gap:10px;
+    margin-top:22px;
+  }
+  button{
+    flex:1;
+    padding:13px;
+    border-radius:8px;
+    border:none;
+    font-size:14px;
+    font-weight:600;
+    letter-spacing:0.5px;
+    cursor:pointer;
+  }
+  #goLiveBtn{ background:var(--crimson); color:white; }
+  #endBtn{ background:transparent; border:1px solid var(--gold); color:var(--gold); }
+  #status{
+    margin-top:18px;
+    font-size:13px;
+    padding:10px;
+    border-radius:8px;
+    display:none;
+  }
+  #status.success{ background:rgba(46,204,113,0.15); color:#6be29a; display:block; }
+  #status.error{ background:rgba(194,24,7,0.15); color:#ff8a75; display:block; }
+  #currentState{
+    margin-top:20px;
+    font-size:12px;
+    color:rgba(243,236,217,0.5);
+    word-break:break-all;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>ETTI RADIO — Producer Panel</h1>
+  <div class="sub">Paste the live video link to put the station on air</div>
+
+  <label>Producer Password</label>
+  <input type="password" id="password" placeholder="Enter password">
+
+  <label>Facebook Live Video Link</label>
+  <input type="text" id="liveUrl" placeholder="Paste link here when going live">
+
+  <div class="btn-row">
+    <button id="goLiveBtn" onclick="setLive()">🔴 Go Live</button>
+    <button id="endBtn" onclick="endLive()">End Broadcast</button>
+  </div>
+
+  <div id="status"></div>
+  <div id="currentState">Checking current status...</div>
+</div>
+
+<script>
+  // Point this to your deployed Railway backend URL
+  const API_BASE = window.location.origin;
+
+  async function loadStatus(){
+    try{
+      const res = await fetch(API_BASE + '/api/live');
+      const data = await res.json();
+      const el = document.getElementById('currentState');
+      if(data.liveUrl && data.liveUrl.trim() !== ''){
+        el.textContent = 'Currently LIVE: ' + data.liveUrl;
+      } else {
+        el.textContent = 'Currently OFFLINE — no live link set';
+      }
+    } catch(e){
+      document.getElementById('currentState').textContent = 'Could not check status';
+    }
+  }
+
+  async function setLive(){
+    const password = document.getElementById('password').value;
+    const liveUrl = document.getElementById('liveUrl').value;
+    await submitUpdate(password, liveUrl);
+  }
+
+  async function endLive(){
+    const password = document.getElementById('password').value;
+    await submitUpdate(password, '');
+  }
+
+  async function submitUpdate(password, liveUrl){
+    const statusEl = document.getElementById('status');
+    statusEl.className = '';
+    statusEl.style.display = 'none';
+
+    try{
+      const res = await fetch(API_BASE + '/api/live', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ password, liveUrl })
+      });
+      const data = await res.json();
+
+      if(res.ok){
+        statusEl.className = 'success';
+        statusEl.textContent = liveUrl ? 'Live link updated! Site is now showing your broadcast.' : 'Broadcast ended. Site now shows offline message.';
+        loadStatus();
+      } else {
+        statusEl.className = 'error';
+        statusEl.textContent = data.error || 'Something went wrong';
+      }
+    } catch(e){
+      statusEl.className = 'error';
+      statusEl.textContent = 'Could not reach the server';
+    }
+  }
+
+  loadStatus();
+</script>
+
+</body>
+</html>
