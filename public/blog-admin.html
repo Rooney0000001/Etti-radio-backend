@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ETTI RADIO — Blog Admin</title>
+<style>
+  :root{
+    --navy:#0b1530;
+    --navy-deep:#070d1f;
+    --gold:#f2b705;
+    --crimson:#c21807;
+    --cream:#f3ecd9;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:linear-gradient(180deg, var(--navy) 0%, var(--navy-deep) 100%);
+    color:var(--cream);
+    font-family:'Segoe UI', sans-serif;
+    min-height:100vh;
+    padding:20px;
+  }
+  .card{
+    background:rgba(255,255,255,0.03);
+    border:1px solid rgba(242,183,5,0.25);
+    border-radius:14px;
+    padding:24px 20px;
+    max-width:520px;
+    margin:0 auto 20px;
+  }
+  h1{ font-size:20px; color:var(--gold); margin-bottom:16px; }
+  h2{ font-size:15px; color:var(--gold); margin-bottom:12px; }
+  label{
+    display:block;
+    font-size:12px;
+    letter-spacing:1px;
+    color:rgba(243,236,217,0.7);
+    margin-bottom:6px;
+    margin-top:14px;
+  }
+  input[type="text"], input[type="password"], textarea{
+    width:100%;
+    padding:12px;
+    border-radius:8px;
+    border:1px solid rgba(242,183,5,0.3);
+    background:rgba(0,0,0,0.3);
+    color:var(--cream);
+    font-size:14px;
+    font-family:inherit;
+  }
+  textarea{ min-height:120px; resize:vertical; }
+  input:focus, textarea:focus{ outline:2px solid var(--gold); }
+  button{
+    padding:13px 20px;
+    border-radius:8px;
+    border:none;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    margin-top:18px;
+  }
+  #postBtn{ background:var(--crimson); color:white; width:100%; }
+  #status{
+    margin-top:14px;
+    font-size:13px;
+    padding:10px;
+    border-radius:8px;
+    display:none;
+  }
+  #status.success{ background:rgba(46,204,113,0.15); color:#6be29a; display:block; }
+  #status.error{ background:rgba(194,24,7,0.15); color:#ff8a75; display:block; }
+
+  .post-item{
+    border:1px solid rgba(242,183,5,0.15);
+    border-radius:10px;
+    padding:14px;
+    margin-bottom:10px;
+  }
+  .post-item h3{ font-size:14px; color:var(--cream); margin-bottom:4px; }
+  .post-item .meta{ font-size:11px; color:rgba(243,236,217,0.5); margin-bottom:8px; }
+  .post-item p{ font-size:13px; color:rgba(243,236,217,0.7); margin-bottom:10px; }
+  .post-item button{
+    margin-top:0;
+    padding:8px 14px;
+    font-size:12px;
+    background:transparent;
+    border:1px solid var(--crimson);
+    color:#ff8a75;
+  }
+  .tag{
+    display:inline-block;
+    font-size:10px;
+    padding:2px 8px;
+    border-radius:999px;
+    margin-left:6px;
+  }
+  .tag.auto{ background:rgba(66,133,244,0.2); color:#8ab4f8; }
+  .tag.manual{ background:rgba(242,183,5,0.2); color:var(--gold); }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>ETTI RADIO — Blog Admin</h1>
+
+  <label>Producer Password</label>
+  <input type="password" id="password" placeholder="Enter password">
+
+  <label>Post Title</label>
+  <input type="text" id="title" placeholder="e.g. ETTI Radio launches new morning show">
+
+  <label>Post Content</label>
+  <textarea id="content" placeholder="Write the full post here..."></textarea>
+
+  <label>Image URL (optional)</label>
+  <input type="text" id="imageUrl" placeholder="https://... (leave blank if none)">
+
+  <button id="postBtn" onclick="createPost()">Publish Post</button>
+  <div id="status"></div>
+</div>
+
+<div class="card">
+  <h2>All Posts</h2>
+  <div id="postsList">Loading...</div>
+</div>
+
+<script>
+  const API_BASE = window.location.origin;
+
+  async function loadPosts(){
+    const listEl = document.getElementById('postsList');
+    try{
+      const res = await fetch(API_BASE + '/api/posts');
+      const data = await res.json();
+      if(!data.posts || data.posts.length === 0){
+        listEl.innerHTML = '<p style="color:rgba(243,236,217,0.5); font-size:13px;">No posts yet.</p>';
+        return;
+      }
+      listEl.innerHTML = data.posts.map(p => `
+        <div class="post-item">
+          <h3>${escapeHtml(p.title)} <span class="tag ${p.category}">${p.category === 'auto' ? 'AI' : 'MANUAL'}</span></h3>
+          <div class="meta">${new Date(p.createdAt).toLocaleString()}</div>
+          <p>${escapeHtml(p.content.slice(0, 120))}${p.content.length > 120 ? '...' : ''}</p>
+          <button onclick="deletePost('${p._id}')">Delete</button>
+        </div>
+      `).join('');
+    } catch(e){
+      listEl.innerHTML = '<p style="color:#ff8a75;">Could not load posts.</p>';
+    }
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  async function createPost(){
+    const password = document.getElementById('password').value;
+    const title = document.getElementById('title').value;
+    const content = document.getElementById('content').value;
+    const imageUrl = document.getElementById('imageUrl').value;
+    const statusEl = document.getElementById('status');
+
+    statusEl.className = '';
+    statusEl.style.display = 'none';
+
+    if(!title || !content){
+      statusEl.className = 'error';
+      statusEl.textContent = 'Title and content are required.';
+      return;
+    }
+
+    try{
+      const res = await fetch(API_BASE + '/api/posts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ password, title, content, imageUrl })
+      });
+      const data = await res.json();
+
+      if(res.ok){
+        statusEl.className = 'success';
+        statusEl.textContent = 'Post published!';
+        document.getElementById('title').value = '';
+        document.getElementById('content').value = '';
+        document.getElementById('imageUrl').value = '';
+        loadPosts();
+      } else {
+        statusEl.className = 'error';
+        statusEl.textContent = data.error || 'Something went wrong';
+      }
+    } catch(e){
+      statusEl.className = 'error';
+      statusEl.textContent = 'Could not reach the server';
+    }
+  }
+
+  async function deletePost(id){
+    const password = document.getElementById('password').value;
+    if(!password){
+      alert('Enter the producer password above first, then tap Delete again.');
+      return;
+    }
+    if(!confirm('Delete this post permanently?')) return;
+
+    try{
+      const res = await fetch(API_BASE + '/api/posts/' + id, {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ password })
+      });
+      const data = await res.json();
+      if(res.ok){
+        loadPosts();
+      } else {
+        alert(data.error || 'Could not delete post');
+      }
+    } catch(e){
+      alert('Could not reach the server');
+    }
+  }
+
+  loadPosts();
+</script>
+
+</body>
+</html>
